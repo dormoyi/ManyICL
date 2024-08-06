@@ -11,13 +11,13 @@ import json
 random.seed(66)
 
 
-def in_context_example(dataset_name, num_ex=5):
+def in_context_example(dataset_name, num_ex=3):
     prompt = ""
     image_paths = []
     num_img = []
 
     if dataset_name == 'xbd':
-        train_path = "/scr/geovlm/xbd_test_canon_classification.json"
+        train_path = "/scr/geovlm/xbd_train_canon_classification.json"
         with open(train_path) as f:
             data = json.load(f)
 
