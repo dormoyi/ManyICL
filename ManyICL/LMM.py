@@ -1,5 +1,5 @@
 # Placeholders
-openai_api_key = "YOUR_OPENAI_API_KEY_HERE"
+openai_api_key = ""
 gcp_project_id = "YOUR_GCP_PROJECT_ID_HERE"
 
 import base64
@@ -24,7 +24,7 @@ class GPT4VAPI:
     def __init__(
         self,
         model="gpt-4o-2024-05-13",
-        img_token="<<IMG>>",
+        img_token="<video>",
         seed=66,
         temperature=0,
         detail="auto",
@@ -72,8 +72,12 @@ class GPT4VAPI:
 
     def __call__(
         self,
+        system_prompt,
         prompt,
-        image_paths=[],
+        image_paths,
+        in_context_prompt,
+        in_context_images,
+        num_images_per_round,
         real_call=True,
         count_time=False,
         max_tokens=50,
@@ -82,22 +86,31 @@ class GPT4VAPI:
         """
         Call the API to get the response for given prompt and images
         """
-        if not isinstance(image_paths, list):  # For single file
-            image_paths = [image_paths]
+
+        prompt = system_prompt + '\n' + in_context_prompt + '\n' + prompt
+        in_context_images.extend(image_paths)
+        image_paths = in_context_images
+
         prompt = prompt.split(self.img_token)
-        assert len(prompt) == len(image_paths) + 1
         if prompt[0] != "":
             messages = [self.generate_text_url(prompt[0])]
+            prompt.pop(0)
         else:
             messages = []
-        for idx in range(1, len(prompt)):
-            messages.append(
-                self.generate_image_url(image_paths[idx - 1], detail=self.detail)
-            )
-            if prompt[idx].strip() != "":
-                messages.append(self.generate_text_url(prompt[idx]))
-        if not real_call:
-            return messages
+
+        while prompt:
+            sub_prompt = prompt.pop(0)
+            num_img = num_images_per_round.pop(0)
+
+            for _ in range(num_img):
+                image_path = image_paths.pop(0)
+                messages.append(self.generate_image_url(image_path, self.detail))
+
+            if sub_prompt.strip() != "":
+                messages.append(self.generate_text_url(sub_prompt))
+
+        assert len(image_paths) == 0
+
         start_time = time.time()
         response = self.client.chat.completions.create(
             model=self.model,
@@ -128,7 +141,7 @@ class GeminiAPI:
     def __init__(
         self,
         model="gemini-1.5-pro-preview-0409",
-        img_token="<<IMG>>",
+        img_token="<video>",
         RPM=5,
         temperature=0,
         location="us-central1",
@@ -189,12 +202,11 @@ class GeminiAPI:
         if not isinstance(image_paths, list):  # For single file
             image_paths = [image_paths]
         prompt = prompt.split(self.img_token)
-        assert len(prompt) == len(image_paths) + 1
         if prompt[0] != "":
             messages = [prompt[0]]
         else:
             messages = []
-        for idx in range(1, len(prompt)):
+        for idx in range(1, len(image_paths)):
             messages.append(self.generate_image_url(image_paths[idx - 1]))
             if prompt[idx].strip() != "":
                 messages.append(prompt[idx])
